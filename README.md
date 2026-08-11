@@ -1,98 +1,203 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# E-commerce Microservices (NestJS)
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+Production-style microservices monorepo built with NestJS, RabbitMQ, MongoDB, and Clerk authentication. The system is split into focused services behind one API Gateway so features can scale independently.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Core Capabilities
 
-## Description
+- Microservices architecture with modular service boundaries
+- API Gateway as the central HTTP entry point
+- Clerk JWT authentication with guards and custom decorators
+- Catalog service for product CRUD with MongoDB
+- Search service for indexing and fast product discovery (Elasticsearch-oriented flow)
+- Media service for uploads and external image storage (Cloudinary-oriented flow)
+- RabbitMQ message broker with RPC-based communication
+- Inter-service communication using async messaging and request-response patterns
+- DTO validation and explicit error mapping at service boundaries
+- Health checks, logs, and reliability-focused design
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+## High-Level Architecture
 
-## Project setup
+```mermaid
+flowchart LR
+		C[Client Apps] --> G[API Gateway]
+		G --> A[Auth Module\nClerk JWT]
+		G --> R[(RabbitMQ)]
 
-```bash
-$ npm install
+		R --> CAT[Catalog Service]
+		R --> SEA[Search Service]
+		R --> MED[Media Service]
+
+		CAT --> M[(MongoDB)]
+		SEA --> E[(Elasticsearch)]
+		MED --> CLD[(Cloudinary)]
 ```
 
-## Compile and run the project
+## Services
 
-```bash
-# development
-$ npm run start
+### 1) API Gateway
 
-# watch mode
-$ npm run start:dev
+Responsibilities:
+- Central entry point for external clients
+- Authentication and authorization enforcement
+- Route orchestration to internal services over RabbitMQ
+- Health endpoint that verifies downstream service availability
 
-# production mode
-$ npm run start:prod
+Main files:
+- apps/gateway/src/main.ts
+- apps/gateway/src/gateway.module.ts
+- apps/gateway/src/gateway.controller.ts
+- apps/gateway/src/auth/*
+
+### 2) Catalog Service
+
+Responsibilities:
+- Product create/read/update/delete operations
+- Product data ownership and persistence logic
+- Service-level validation and domain error handling
+
+Main files:
+- apps/catalog/src/main.ts
+- apps/catalog/src/catalog.controller.ts
+- apps/catalog/src/catalog.service.ts
+- apps/catalog/src/catalog.module.ts
+
+### 3) Search Service
+
+Responsibilities:
+- Search index management and synchronization workflow
+- Query APIs for fast keyword/product retrieval
+- Read-optimized model for discovery experiences
+
+Main files:
+- apps/search/src/main.ts
+- apps/search/src/search.controller.ts
+- apps/search/src/search.service.ts
+- apps/search/src/search.module.ts
+
+### 4) Media Service
+
+Responsibilities:
+- File upload handling
+- Media metadata management
+- External image storage integration flow (Cloudinary-oriented)
+
+Main files:
+- apps/media/src/main.ts
+- apps/media/src/media.controller.ts
+- apps/media/src/media.service.ts
+- apps/media/src/media.module.ts
+
+## Authentication and Authorization
+
+The Gateway applies authentication globally using a JWT guard and custom decorators.
+
+Flow:
+1. Client sends Bearer token to Gateway
+2. Guard verifies token with Clerk server SDK
+3. Request user context is attached to the request
+4. Local user record is upserted for role and profile consistency
+5. Route-level decorators enforce public/admin access rules
+
+Key auth files:
+- apps/gateway/src/auth/auth.service.ts
+- apps/gateway/src/auth/jwt-auth-guard.ts
+- apps/gateway/src/auth/current-user-decorator.ts
+- apps/gateway/src/auth/public.decorater.ts
+- apps/gateway/src/auth/admin.decorator.ts
+
+## Messaging and RPC
+
+RabbitMQ is used as the transport layer between Gateway and domain services.
+
+Patterns used:
+- RPC request-response for immediate client-facing operations
+- Async message-based integration for decoupled service workflows
+
+Queues are configured via environment variables:
+- CATALOG_QUEUE
+- SEARCH_QUEUE
+- MEDIA_QUEUE
+
+## Validation and Error Strategy
+
+- DTO-based payload validation at API boundaries
+- Consistent exception mapping for predictable client responses
+- Service-layer checks to avoid leaking infrastructure-level errors
+
+## Health, Logs, and Reliability
+
+Reliability layer includes:
+- Gateway health checks for downstream services
+- Structured logs across service startup and message handling
+- Clear service boundaries that reduce blast radius during failures
+- Queue-based communication that supports loose coupling and resiliency
+
+## Project Structure
+
+```text
+apps/
+	gateway/
+	catalog/
+	search/
+	media/
 ```
 
-## Run tests
+## Environment Configuration
+
+Create a .env file at repository root.
+
+Required variables (example names):
+- GATEWAY_PORT (code also has fallback patterns)
+- RABBITMQ_URL
+- CATALOG_QUEUE
+- SEARCH_QUEUE
+- MEDIA_QUEUE
+- CLERK_SECRET_KEY
+- PUBLIC_PUBLISHABLE_KEY
+- MongoDb-URL
+
+Optional service-specific variables:
+- Elasticsearch connection variables for search indexing
+- Cloudinary variables for media upload/storage
+
+Important:
+- Never commit real secrets to Git history.
+- Rotate keys immediately if they were exposed.
+
+## Local Development
+
+Install dependencies:
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+npm install
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Run all services in watch mode:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+npm run start:dev
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+Run individual apps:
 
-## Resources
+```bash
+npx nest start gateway --watch
+npx nest start catalog --watch
+npx nest start search --watch
+npx nest start media --watch
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+Run tests:
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+```bash
+npm run test
+npm run test:e2e
+```
 
-## Support
+## Suggested Next Improvements
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- Add shared contracts package for DTO/event schemas
+- Add dead-letter queues and retry policies per service
+- Add OpenTelemetry traces across Gateway and services
+- Add centralized config validation and secret management
+- Add CI pipeline with lint, test, and smoke checks
