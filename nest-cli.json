@@ -45,6 +45,15 @@
         "tsConfigPath": "apps/nestjs-microservices/tsconfig.app.json"
       }
     },
+    "rpc": {
+      "type": "library",
+      "root": "libs/rpc",
+      "entryFile": "index",
+      "sourceRoot": "libs/rpc/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/rpc/tsconfig.lib.json"
+      }
+    },
     "search": {
       "type": "application",
       "root": "apps/search",

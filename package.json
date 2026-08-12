@@ -74,7 +74,11 @@
     "coverageDirectory": "./coverage",
     "testEnvironment": "node",
     "roots": [
-      "<rootDir>/apps/"
-    ]
+      "<rootDir>/apps/",
+      "<rootDir>/libs/"
+    ],
+    "moduleNameMapper": {
+      "^@app/rpc(|/.*)$": "<rootDir>/libs/rpc/src/$1"
+    }
   }
 }
