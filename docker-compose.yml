@@ -1,0 +1,107 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: nestjs-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo:
+    image: mongo:7
+    container_name: nestjs-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    image: node:22-alpine
+    container_name: nestjs-gateway
+    working_dir: /usr/src/app
+    command: sh -c "npm install && npx nest start gateway --watch"
+    env_file:
+      - .env
+    environment:
+      GATEWAY_PORT: 4000
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      MongoDb-URL: mongodb://mongo:27017/nestjs-microservices
+      CATALOG_QUEUE: catalog_queue
+      SEARCH_QUEUE: search_queue
+      MEDIA_QUEUE: media_queue
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./:/usr/src/app
+      - /usr/src/app/node_modules
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+
+  catalog:
+    image: node:22-alpine
+    container_name: nestjs-catalog
+    working_dir: /usr/src/app
+    command: sh -c "npm install && npx nest start catalog --watch"
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      CATALOG_QUEUE: catalog_queue
+    volumes:
+      - ./:/usr/src/app
+      - /usr/src/app/node_modules
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  search:
+    image: node:22-alpine
+    container_name: nestjs-search
+    working_dir: /usr/src/app
+    command: sh -c "npm install && npx nest start search --watch"
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      SEARCH_QUEUE: search_queue
+    volumes:
+      - ./:/usr/src/app
+      - /usr/src/app/node_modules
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  media:
+    image: node:22-alpine
+    container_name: nestjs-media
+    working_dir: /usr/src/app
+    command: sh -c "npm install && npx nest start media --watch"
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      MEDIA_QUEUE: media_queue
+    volumes:
+      - ./:/usr/src/app
+      - /usr/src/app/node_modules
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  mongo_data:
+  rabbitmq_data:

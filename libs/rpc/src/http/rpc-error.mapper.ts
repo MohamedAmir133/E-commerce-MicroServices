@@ -15,7 +15,6 @@ export function mapRpcErrorToHttp(err: any): never {
   if (code === 'BAD_REQUEST' || code === 'VALIDATION_ERROR') {
     throw new BadRequestException(message);
   }
-
   if (code === 'NOT_FOUND') {
     throw new NotFoundException(message);
   }

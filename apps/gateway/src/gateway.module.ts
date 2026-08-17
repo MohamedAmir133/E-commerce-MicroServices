@@ -6,12 +6,19 @@ import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/user.module';
+import { ProductsHttpController } from './products/products.controller';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    MongooseModule.forRoot(process.env['MongoDb-URL'] as string),
+    MongooseModule.forRoot(
+      process.env.MONGO_URI_USERS ??
+        process.env['MongoDb-URL-Users'] ??
+        process.env['MongoDb-URL'] ??
+        'mongodb://localhost:27017/ace-shop-users',
+    ),
     AuthModule,
     UsersModule,
     ClientsModule.register([
@@ -50,7 +57,7 @@ import { UsersModule } from './users/user.module';
       },
     ]),
   ],
-  controllers: [GatewayController],
+  controllers: [GatewayController, ProductsHttpController],
   providers: [GatewayService],
 })
 export class GatewayModule {}

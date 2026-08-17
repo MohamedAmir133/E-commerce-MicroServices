@@ -31,12 +31,14 @@ function hasClerkPayload(
 export class AuthService {
   private readonly clerk = createClerkClient({
     secretKey: process.env.CLERK_SECRET_KEY,
-    publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+    publishableKey:
+      process.env.CLERK_PUBLISHABLE_KEY ?? process.env.PUBLIC_PUBLISHABLE_KEY,
   });
 
   private jwtVerifyOptions(): Record<string, any> {
     return {
       secretKey: process.env.CLERK_SECRET_KEY,
+      clockSkewInMs: 1000 * 60 * 10, // 10 minutes leeway for clock skew
     };
   }
 
@@ -103,7 +105,8 @@ export class AuthService {
         role,
         isAdmin: false,
       };
-    } catch {
+    } catch (error) {
+      console.error('Token verification error:', error);
       throw new UnauthorizedException('Invalid or expired token');
     }
   }
