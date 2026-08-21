@@ -1,31 +1,36 @@
 import { Module } from '@nestjs/common';
 import { CatalogController } from './catalog.controller';
 import { CatalogService } from './catalog.service';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { Product, ProductSchema } from './product/product.schema';
 import { ProductController } from './product/product.controller';
 import { ProductService } from './product/product.service';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-import { ProductEventsPubliser } from './events/product-events.publiser';
+import { ProductEventsPublisher } from './events/product-events.publisher';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    MongooseModule.forRoot(
-      process.env.MONGO_URI_CATALOG ??
-        process.env['MongoDb-URL-Catalog'] ??
-        'mongodb://mongo:27017/nestjs-microservices-catalog',
-    ),
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        uri:
+          configService.get<string>('MONGO_URI_CATALOG') ??
+          configService.get<string>('MongoDb-URL-Catalog') ??
+          'mongodb://localhost:27017/nestjs-microservices-catalog',
+      }),
+    }),
 
     MongooseModule.forFeature([{ name: Product.name, schema: ProductSchema }]),
     //two patterns
     // gateway -> http -> service
     // service -> rmq -> service
 
-    // catalog talks directlt to search via RMQ client (NOT via gateway)
+    // catalog talks directly to search via RMQ client (NOT via gateway)
     ClientsModule.register([
       {
         name: 'SEARCH_EVENTS_CLIENT',
@@ -40,6 +45,6 @@ import { ProductEventsPubliser } from './events/product-events.publiser';
     ]),
   ],
   controllers: [CatalogController, ProductController],
-  providers: [CatalogService, ProductService, ProductEventsPubliser],
+  providers: [CatalogService, ProductService, ProductEventsPublisher],
 })
 export class CatalogModule {}

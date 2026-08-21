@@ -1,168 +1,147 @@
-# E-commerce Microservices (NestJS)
+# NestJS Microservices E-Commerce
 
-Production-style microservices monorepo built with NestJS, RabbitMQ, MongoDB, and Clerk authentication. The system is split into focused services behind one API Gateway so features can scale independently.
+This repository is a NestJS microservices monorepo for an e-commerce-style system. It uses RabbitMQ for service-to-service messaging, MongoDB for persistence, Clerk for authentication, and Cloudinary for media storage.
 
-## Core Capabilities
+The system is organized around a gateway plus focused domain services:
+- `gateway` handles HTTP traffic, authentication, and orchestration
+- `catalog` owns product data
+- `search` maintains a read-optimized product index
+- `media` handles image upload and attachment
 
-- Microservices architecture with modular service boundaries
-- API Gateway as the central HTTP entry point
-- Clerk JWT authentication with guards and custom decorators
-- Catalog service for product CRUD with MongoDB
-- Search service for indexing and fast product discovery (Elasticsearch-oriented flow)
-- Media service for uploads and external image storage (Cloudinary-oriented flow)
-- RabbitMQ message broker with RPC-based communication
-- Inter-service communication using async messaging and request-response patterns
-- DTO validation and explicit error mapping at service boundaries
-- Health checks, logs, and reliability-focused design
-
-## High-Level Architecture
+## Architecture
 
 ```mermaid
 flowchart LR
-		C[Client Apps] --> G[API Gateway]
-		G --> A[Auth Module\nClerk JWT]
-		G --> R[(RabbitMQ)]
+  Client[Client / API Consumer] --> Gateway[Gateway]
+  Gateway --> Rabbit[(RabbitMQ)]
 
-		R --> CAT[Catalog Service]
-		R --> SEA[Search Service]
-		R --> MED[Media Service]
+  Rabbit --> Catalog[Catalog Service]
+  Rabbit --> Search[Search Service]
+  Rabbit --> Media[Media Service]
 
-		CAT --> M[(MongoDB)]
-		SEA --> E[(Elasticsearch)]
-		MED --> CLD[(Cloudinary)]
+  Catalog -.->|product.created| Rabbit
+  Rabbit -.->|event consumed| Search
+
+  Catalog --> CatalogDB[(MongoDB)]
+  Search --> SearchDB[(MongoDB)]
+  Gateway --> UsersDB[(MongoDB)]
+  Media --> MediaDB[(MongoDB)]
+  Media --> Cloudinary[(Cloudinary)]
 ```
 
 ## Services
 
-### 1) API Gateway
+### Gateway
+
+The gateway is the public HTTP entry point.
 
 Responsibilities:
-- Central entry point for external clients
-- Authentication and authorization enforcement
-- Route orchestration to internal services over RabbitMQ
-- Health endpoint that verifies downstream service availability
+- JWT authentication with Clerk
+- Role-aware access control
+- HTTP-to-RMQ routing
+- Health checks for downstream services
 
-Main files:
-- apps/gateway/src/main.ts
-- apps/gateway/src/gateway.module.ts
-- apps/gateway/src/gateway.controller.ts
-- apps/gateway/src/auth/*
+### Catalog
 
-### 2) Catalog Service
+The catalog service owns product persistence and publishes product-created events after a successful write.
 
 Responsibilities:
-- Product create/read/update/delete operations
-- Product data ownership and persistence logic
-- Service-level validation and domain error handling
+- Create and list products
+- Fetch a product by ID
+- Validate product payloads
+- Emit `product.created` after product creation
 
-Main files:
-- apps/catalog/src/main.ts
-- apps/catalog/src/catalog.controller.ts
-- apps/catalog/src/catalog.service.ts
-- apps/catalog/src/catalog.module.ts
+### Search
 
-### 3) Search Service
+The search service consumes catalog events and maintains a queryable index document.
 
 Responsibilities:
-- Search index management and synchronization workflow
-- Query APIs for fast keyword/product retrieval
-- Read-optimized model for discovery experiences
+- Consume `product.created`
+- Upsert search documents in MongoDB
+- Query products by keyword
 
-Main files:
-- apps/search/src/main.ts
-- apps/search/src/search.controller.ts
-- apps/search/src/search.service.ts
-- apps/search/src/search.module.ts
+### Media
 
-### 4) Media Service
+The media service stores uploaded product images in Cloudinary and tracks media metadata in MongoDB.
 
 Responsibilities:
-- File upload handling
-- Media metadata management
-- External image storage integration flow (Cloudinary-oriented)
+- Upload images
+- Attach media to products
+- Persist media metadata
 
-Main files:
-- apps/media/src/main.ts
-- apps/media/src/media.controller.ts
-- apps/media/src/media.service.ts
-- apps/media/src/media.module.ts
+## Messaging Flow
 
-## Authentication and Authorization
+### Request/response
 
-The Gateway applies authentication globally using a JWT guard and custom decorators.
+The gateway uses RMQ request/response for client-facing operations such as:
+- `product.create`
+- `product.list`
+- `product.getById`
+- `search.query`
 
-Flow:
-1. Client sends Bearer token to Gateway
-2. Guard verifies token with Clerk server SDK
-3. Request user context is attached to the request
-4. Local user record is upserted for role and profile consistency
-5. Route-level decorators enforce public/admin access rules
+### Event-driven updates
 
-Key auth files:
-- apps/gateway/src/auth/auth.service.ts
-- apps/gateway/src/auth/jwt-auth-guard.ts
-- apps/gateway/src/auth/current-user-decorator.ts
-- apps/gateway/src/auth/public.decorater.ts
-- apps/gateway/src/auth/admin.decorator.ts
+The catalog service emits `product.created` as a one-way event.
+The search service listens for that event and updates its index document.
 
-## Messaging and RPC
+## Search API
 
-RabbitMQ is used as the transport layer between Gateway and domain services.
+The gateway exposes:
 
-Patterns used:
-- RPC request-response for immediate client-facing operations
-- Async message-based integration for decoupled service workflows
-
-Queues are configured via environment variables:
-- CATALOG_QUEUE
-- SEARCH_QUEUE
-- MEDIA_QUEUE
-
-## Validation and Error Strategy
-
-- DTO-based payload validation at API boundaries
-- Consistent exception mapping for predictable client responses
-- Service-layer checks to avoid leaking infrastructure-level errors
-
-## Health, Logs, and Reliability
-
-Reliability layer includes:
-- Gateway health checks for downstream services
-- Structured logs across service startup and message handling
-- Clear service boundaries that reduce blast radius during failures
-- Queue-based communication that supports loose coupling and resiliency
-
-## Project Structure
-
-```text
-apps/
-	gateway/
-	catalog/
-	search/
-	media/
+```http
+GET /search?q=eva
+GET /search?q=eva&limit=10
 ```
 
-## Environment Configuration
-
-Create a .env file at repository root.
-
-Required variables (example names):
-- GATEWAY_PORT (code also has fallback patterns)
-- RABBITMQ_URL
-- CATALOG_QUEUE
-- SEARCH_QUEUE
-- MEDIA_QUEUE
-- CLERK_SECRET_KEY
-- PUBLIC_PUBLISHABLE_KEY
-- MongoDb-URL
-
-Optional service-specific variables:
-- Elasticsearch connection variables for search indexing
-- Cloudinary variables for media upload/storage
-
 Important:
-- Never commit real secrets to Git history.
-- Rotate keys immediately if they were exposed.
+- `q` is required
+- `limit` is optional
+- a request without `q` returns a validation error
+
+## Product API
+
+Typical gateway product endpoints:
+
+- `POST /products`
+- `GET /products`
+- `GET /products/:id`
+
+The exact request body is validated by the gateway before it is forwarded to catalog.
+
+## Environment Variables
+
+Create a `.env` file in the repository root.
+
+Common variables used by the apps:
+
+- `GATEWAY_PORT`
+- `RABBITMQ_URL`
+- `CATALOG_QUEUE`
+- `SEARCH_QUEUE`
+- `MEDIA_QUEUE`
+- `CATALOG_TCP_PORT`
+- `SEARCH_TCP_PORT`
+- `MEDIA_TCP_PORT`
+- `PUBLIC_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+
+MongoDB variables supported by the current code:
+
+- `MongoDb-URL-Users`
+- `MongoDb-URL-Catalog`
+- `MongoDb-URL-SEARCH`
+- `MongoDb-URL-MEDIA`
+
+Cloudinary variables:
+
+- `CLOUDINARY_URL`
+- `CLOUDINARY_API_KEY`
+- `CLOUDINARY_CLOUD_NAME`
+- `CLOUDINARY_API_SECRET`
+
+Notes:
+- The repo currently supports both `MongoDb-URL-*` and some `MONGO_*` fallbacks in code.
+- If you run services locally, the fallback MongoDB URIs point to `localhost`.
 
 ## Local Development
 
@@ -172,13 +151,13 @@ Install dependencies:
 npm install
 ```
 
-Run all services in watch mode:
+Run the full workspace in dev mode:
 
 ```bash
 npm run start:dev
 ```
 
-Run individual apps:
+Run a single service:
 
 ```bash
 npx nest start gateway --watch
@@ -187,17 +166,26 @@ npx nest start search --watch
 npx nest start media --watch
 ```
 
-Run tests:
+Build the project:
 
 ```bash
-npm run test
-npm run test:e2e
+npm run build
 ```
 
-## Suggested Next Improvements
+## Docker
 
-- Add shared contracts package for DTO/event schemas
-- Add dead-letter queues and retry policies per service
-- Add OpenTelemetry traces across Gateway and services
-- Add centralized config validation and secret management
-- Add CI pipeline with lint, test, and smoke checks
+The repository includes a `docker-compose.yml` for RabbitMQ and MongoDB-backed service startup.
+
+## Validation and Error Handling
+
+The codebase uses:
+- DTO validation for inbound payloads
+- service-level guards for domain rules
+- RPC exception mapping for predictable HTTP responses
+<!-- 
+## Current Implementation Notes
+
+- Product creation in catalog emits `product.created`
+- Search consumes that event and maintains its own MongoDB collection
+- Gateway search requests must include `q`
+- The gateway uses Clerk-protected routes with public endpoints marked by the `Public` decorator -->

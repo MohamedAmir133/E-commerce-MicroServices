@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Product, ProductDocument, ProductStatus } from './product.schema';
 import { isValidObjectId, Model } from 'mongoose';
 import { rpcBadRequest, rpcNotFound } from '@app/rpc';
-import { ProductEventsPubliser } from '../events/product-events.publiser';
+import { ProductEventsPublisher } from '../events/product-events.publisher';
 
 @Injectable()
 export class ProductService {
@@ -11,7 +11,7 @@ export class ProductService {
     @InjectModel(Product.name)
     private readonly productModel: Model<ProductDocument>,
 
-    private readonly events: ProductEventsPubliser,
+    private readonly events: ProductEventsPublisher,
   ) {}
 
   async createNewProduct(input: {

@@ -2,23 +2,29 @@ import { Module } from '@nestjs/common';
 import { GatewayController } from './gateway.controller';
 import { GatewayService } from './gateway.service';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/user.module';
 import { ProductsHttpController } from './products/products.controller';
+import { SearchHttpController } from './search/search.controller';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    MongooseModule.forRoot(
-      process.env.MONGO_URI_USERS ??
-        process.env['MongoDb-URL-Users'] ??
-        process.env['MongoDb-URL'] ??
-        'mongodb://localhost:27017/ace-shop-users',
-    ),
+    MongooseModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        uri:
+          configService.get<string>('MONGO_URI_USERS') ??
+          configService.get<string>('MongoDb-URL-Users') ??
+          configService.get<string>('MongoDb-URL') ??
+          'mongodb://localhost:27017/ace-shop-users',
+      }),
+    }),
     AuthModule,
     UsersModule,
     ClientsModule.register([
@@ -57,7 +63,7 @@ import { ProductsHttpController } from './products/products.controller';
       },
     ]),
   ],
-  controllers: [GatewayController, ProductsHttpController],
+  controllers: [GatewayController, ProductsHttpController, SearchHttpController],
   providers: [GatewayService],
 })
 export class GatewayModule {}
