@@ -102,6 +102,50 @@ services:
       rabbitmq:
         condition: service_healthy
 
+  postgres:
+    image: postgres:15-alpine
+    container_name: nestjs-postgres
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: users_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  users:
+    image: node:22-alpine
+    container_name: nestjs-users
+    working_dir: /usr/src/app
+    command: sh -c "npm install && npx nest start users --watch"
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      USERS_QUEUE: users_queue
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: users_db
+    volumes:
+      - ./:/usr/src/app
+      - /usr/src/app/node_modules
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
 volumes:
   mongo_data:
   rabbitmq_data:
+  postgres_data:
+

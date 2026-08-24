@@ -1,14 +1,26 @@
 import { Module } from '@nestjs/common';
-import { MongooseModule } from '@nestjs/mongoose';
-import { User, UserSchema } from './user.schema';
+import { ClientsModule, Transport } from '@nestjs/microservices';
 import { UsersService } from './user.service';
 
 @Module({
   imports: [
-    // registers the User model for dependency injection
-    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    ClientsModule.register([
+      {
+        name: 'USERS_CLIENT',
+        transport: Transport.RMQ,
+        options: {
+          urls: [process.env.RABBITMQ_URL ?? 'amqp://localhost:5672'],
+          queue: process.env.USERS_QUEUE ?? 'users_queue',
+          queueOptions: {
+            durable: false,
+          },
+        },
+      },
+    ]),
   ],
   providers: [UsersService],
   exports: [UsersService],
 })
 export class UsersModule {}
+
+
