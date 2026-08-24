@@ -130,6 +130,27 @@ The users service creates or updates the user in PostgreSQL and returns the stor
 The catalog service emits `product.created` as a one-way event.
 The search service listens for that event and updates its index document.
 
+## Data Storage
+
+The services keep their own persistence models. MongoDB-backed services store flexible documents in collections, while PostgreSQL-backed services store relational data in tables.
+
+Persistence ownership:
+- MongoDB collections: `products`, `search_products`, `media`
+- PostgreSQL tables: `users`, `orders`
+
+### Data connections
+
+![Data connections diagram](docs/data-connections.svg)
+
+Important:
+- MongoDB and PostgreSQL do not share physical foreign keys.
+- PostgreSQL keeps `users` and `orders` as tables.
+- MongoDB keeps product, search, and media data as collections.
+- `users.clerkUserId` is the identity value copied from Clerk and used by the gateway request context.
+- Product IDs from MongoDB are copied as `productId` into search, media, and orders records.
+- `orders.userId` currently stores the authenticated Clerk user ID from the gateway order request.
+- Cross-service consistency is handled through RMQ calls and events, not direct database joins.
+
 ## Auth API
 
 The gateway exposes:
