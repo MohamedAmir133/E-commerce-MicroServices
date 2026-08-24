@@ -7,6 +7,7 @@ import {
   Post,
   UploadedFile,
   UseInterceptors,
+  Logger,
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { CurrentUser } from '../auth/current-user-decorator';
@@ -125,6 +126,7 @@ export class ProductsHttpController {
   @Public()
   async listProducts() {
     try {
+      Logger.log('list products');
       return await firstValueFrom(this.catalogClient.send('product.list', {}));
     } catch (err) {
       mapRpcErrorToHttp(err);

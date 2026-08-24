@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Product, ProductDocument, ProductStatus } from './product.schema';
 import { isValidObjectId, Model } from 'mongoose';
@@ -63,6 +63,7 @@ export class ProductService {
   }
 
   async listProducts() {
+    Logger.log('list products');
     return this.productModel.find().sort({ createdAt: -1 }).exec();
   }
 

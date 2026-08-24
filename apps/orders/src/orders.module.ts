@@ -1,15 +1,15 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { OrdersController } from './orders.controller';
+import { OrdersService } from './orders.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { UsersController } from './users.controller';
-import { UsersService } from './users.service';
-import { UserEntity } from './user.entity';
+import { OrderEntity } from './order.entity';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ClientsModule, Transport } from '@nestjs/microservices';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
+    TypeOrmModule.forFeature([OrderEntity]),
+    ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -20,14 +20,13 @@ import { UserEntity } from './user.entity';
         username: configService.get<string>('POSTGRES_USER') ?? 'postgres',
         password: configService.get<string>('POSTGRES_PASSWORD') ?? 'password',
         database: configService.get<string>('POSTGRES_DB') ?? 'users_db',
-        entities: [UserEntity],
-        synchronize: true, // Auto-create schema in development
+        entities: [OrderEntity],
+        autoLoadEntities: true,
+        synchronize: true,
       }),
     }),
-    TypeOrmModule.forFeature([UserEntity]),
   ],
-  controllers: [UsersController],
-  providers: [UsersService],
+  controllers: [OrdersController],
+  providers: [OrdersService],
 })
-export class UsersModule {}
-
+export class OrdersModule {}

@@ -2,7 +2,7 @@ import { Controller } from '@nestjs/common';
 import { ProductService } from './product.service';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { CreateProductDto, GetProductByIdDto } from './product.dto';
-
+import { Logger } from '@nestjs/common';
 @Controller()
 export class ProductController {
   constructor(private readonly productsService: ProductService) {}
@@ -14,6 +14,7 @@ export class ProductController {
 
   @MessagePattern('product.list')
   list() {
+    Logger.log('list products');
     return this.productsService.listProducts();
   }
 

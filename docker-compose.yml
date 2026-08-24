@@ -10,8 +10,9 @@ services:
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 15s
+      retries: 10
+      start_period: 60s
 
   mongo:
     image: mongo:7
@@ -61,11 +62,14 @@ services:
     environment:
       RABBITMQ_URL: amqp://rabbitmq:5672
       CATALOG_QUEUE: catalog_queue
+      MongoDb-URL-Catalog: mongodb://mongo:27017/nestjs-microservices-catalog
     volumes:
       - ./:/usr/src/app
       - /usr/src/app/node_modules
     depends_on:
       rabbitmq:
+        condition: service_healthy
+      mongo:
         condition: service_healthy
 
   search:
@@ -78,11 +82,14 @@ services:
     environment:
       RABBITMQ_URL: amqp://rabbitmq:5672
       SEARCH_QUEUE: search_queue
+      MongoDb-URL-SEARCH: mongodb://mongo:27017/nestjs-microservices-search
     volumes:
       - ./:/usr/src/app
       - /usr/src/app/node_modules
     depends_on:
       rabbitmq:
+        condition: service_healthy
+      mongo:
         condition: service_healthy
 
   media:
@@ -95,12 +102,39 @@ services:
     environment:
       RABBITMQ_URL: amqp://rabbitmq:5672
       MEDIA_QUEUE: media_queue
+      MongoDb-URL-MEDIA: mongodb://mongo:27017/ace-shop-media
     volumes:
       - ./:/usr/src/app
       - /usr/src/app/node_modules
     depends_on:
       rabbitmq:
         condition: service_healthy
+      mongo:
+        condition: service_healthy
+  orders:
+    image: node:22-alpine
+    container_name: nestjs-orders
+    working_dir: /usr/src/app
+    command: sh -c "npm install && npx nest start orders --watch"
+    env_file: 
+      - .env
+    environment:
+      RABBITMQ_URL: amqp://rabbitmq:5672
+      ORDERS_QUEUE: orders_queue
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: users_db
+    volumes:
+      - ./:/usr/src/app
+      - /usr/src/app/node_modules
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:
+        condition: service_started
+
 
   postgres:
     image: postgres:15-alpine
